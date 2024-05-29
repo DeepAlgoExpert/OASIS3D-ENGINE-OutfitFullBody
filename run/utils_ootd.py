@@ -53,9 +53,128 @@ def refine_mask(mask):
 
     return refine_mask
 
+def fill_above_y_with_white(image: Image.Image, threshold_y: int):
+    # Convert the image to numpy array
+    img_array = np.array(image)
+
+    # Create a mask to fill the area above the threshold y-value with white color
+    mask = np.ones_like(img_array[:, :, 0]) * 255
+    mask[:threshold_y, :] = 0  # Set pixels above threshold_y to 0 (black)
+
+    # Apply the mask to the image
+    img_array[mask == 0] = [255, 255, 255]  # Fill pixels with black mask with white color
+
+    # Convert the result back to a PIL Image
+    result_image = Image.fromarray(img_array)
+
+    return result_image
+
+def fill_below_y_with_white(image: Image.Image, threshold_y: int):
+    # Convert the image to numpy array
+    img_array = np.array(image)
+
+    # Ensure threshold_y is an integer
+    if not isinstance(threshold_y, int):
+        raise ValueError("threshold_y must be an integer")
+
+    # Create a mask to fill the area below the threshold y-value with black color
+    mask = np.ones_like(img_array[:, :, 0]) * 255
+    mask[threshold_y:, :] = 0  # Set pixels below threshold_y to 0 (black)
+
+    # Apply the mask to the image
+    img_array[mask == 0] = [255, 255, 255]  # Fill pixels with black mask with white color
+
+    # Convert the result back to a PIL Image
+    result_image = Image.fromarray(img_array)
+
+    return result_image
+
 def get_mask_location(model_type, category, model_parse: Image.Image, keypoint: dict, width=384,height=512):
     im_parse = model_parse.resize((width, height), Image.NEAREST)
     parse_array = np.array(im_parse)
+
+    # Load pose points
+    pose_data = keypoint["pose_keypoints_2d"]
+    pose_data = np.array(pose_data)
+    pose_data = pose_data.reshape((-1, 2))
+
+    parse_left_leg_shoe = (parse_array == label_map["left_leg"]).astype(np.float32) + \
+                        (parse_array == label_map["left_shoe"]).astype(np.float32)                  
+    inpaint_mask = 1 - parse_left_leg_shoe
+    img = np.where(inpaint_mask, 255, 0)
+
+    # Convert img to uint8 array
+    img_uint8 = img.astype(np.uint8)
+
+    # Create the PIL Image
+    img_left_leg_shoe = Image.fromarray(img_uint8, mode='L')  # mode='L' for grayscale image
+
+    # Convert to RGB if needed
+    img_left_leg_shoe = img_left_leg_shoe.convert('RGB')
+
+    #fixed_img_left_leg_shoe = fill_above_y_with_white(img_left_leg_shoe, top_left_shoe[1]-50)
+    fixed_img_left_leg_shoe = fill_above_y_with_white(img_left_leg_shoe, int(tuple(pose_data[13][:2])[1]))
+    save_img_left_leg_shoe = fixed_img_left_leg_shoe.convert('RGB')
+    save_img_left_leg_shoe.save('./images_output/save_img_left_leg_shoe.jpg')
+
+    print('pose data1:', tuple(pose_data[1][:2])[1])
+    print('pose data2:', tuple(pose_data[2][:2])[1])
+    print('pose data3:', tuple(pose_data[3][:2])[1])
+    print('pose data4:', tuple(pose_data[4][:2])[1])
+    print('pose data5:', tuple(pose_data[5][:2])[1])
+    print('pose data6:', tuple(pose_data[6][:2])[1])
+    print('pose data7:', tuple(pose_data[7][:2])[1])
+    print('pose data8:', tuple(pose_data[8][:2])[1])
+    print('pose data9:', tuple(pose_data[9][:2])[1])
+    print('pose data10:', tuple(pose_data[10][:2])[1])
+    print('pose data11:', tuple(pose_data[11][:2])[1])
+    print('pose data12:', tuple(pose_data[12][:2])[1])
+    print('pose data13:', tuple(pose_data[13][:2])[1])
+    print('pose data14:', tuple(pose_data[14][:2])[1])
+    # Convert the image to a grayscale NumPy array
+    img_array = np.array(fixed_img_left_leg_shoe.convert('L'))
+
+    # Threshold the grayscale array to convert it back to a binary array
+    left_leg_shoe_mask = (img_array == 255).astype(np.float32)
+
+    # Invert the binary array if needed (optional)
+    left_leg_shoe_mask = 1 - left_leg_shoe_mask
+
+    # Display the recovered parse_right_shoe array
+    print('left_leg_shoe_mask:', left_leg_shoe_mask)
+
+
+    parse_right_leg_shoe = (parse_array == label_map["right_leg"]).astype(np.float32) + \
+                        (parse_array == label_map["right_shoe"]).astype(np.float32)                  
+    inpaint_mask = 1 - parse_right_leg_shoe
+    img = np.where(inpaint_mask, 255, 0)
+
+     # Convert img to uint8 array
+    img_uint8 = img.astype(np.uint8)
+
+    # Create the PIL Image
+    img_right_leg_shoe = Image.fromarray(img_uint8, mode='L')  # mode='L' for grayscale image
+
+    # Convert to RGB if needed
+    img_right_leg_shoe = img_right_leg_shoe.convert('RGB')
+
+    #fixed_img_right_leg_shoe = fill_above_y_with_white(img_right_leg_shoe, top_right_shoe[1]-50)
+    fixed_img_right_leg_shoe = fill_above_y_with_white(img_right_leg_shoe, int(tuple(pose_data[10][:2])[1]))
+    save_img_right_leg_shoe = fixed_img_right_leg_shoe.convert('RGB')
+    save_img_right_leg_shoe.save('./images_output/save_img_right_leg_shoe.jpg')
+
+    # Convert the image to a grayscale NumPy array
+    img_array = np.array(fixed_img_right_leg_shoe.convert('L'))
+
+    # Threshold the grayscale array to convert it back to a binary array
+    right_leg_shoe_mask = (img_array == 255).astype(np.float32)
+
+    # Invert the binary array if needed (optional)
+    right_leg_shoe_mask = 1 - right_leg_shoe_mask
+
+    # Display the recovered parse_right_shoe array
+    print('right_leg_shoe_mask:', right_leg_shoe_mask)
+
 
     if model_type == 'hd':
         arm_width = 60
@@ -72,7 +191,8 @@ def get_mask_location(model_type, category, model_parse: Image.Image, keypoint: 
                         (parse_array == label_map["right_shoe"]).astype(np.float32) + \
                         (parse_array == label_map["hat"]).astype(np.float32) + \
                         (parse_array == label_map["sunglasses"]).astype(np.float32) + \
-                        (parse_array == label_map["bag"]).astype(np.float32)
+                        (parse_array == label_map["bag"]).astype(np.float32) + \
+                        left_leg_shoe_mask + right_leg_shoe_mask
 
     parser_mask_changeable = (parse_array == label_map["background"]).astype(np.float32)
 
@@ -101,7 +221,8 @@ def get_mask_location(model_type, category, model_parse: Image.Image, keypoint: 
                      (parse_array == 5).astype(np.float32)
         parser_mask_fixed += (parse_array == label_map["upper_clothes"]).astype(np.float32) + \
                              (parse_array == 14).astype(np.float32) + \
-                             (parse_array == 15).astype(np.float32)
+                             (parse_array == 15).astype(np.float32) + \
+                             left_leg_shoe_mask + right_leg_shoe_mask
         parser_mask_changeable += np.logical_and(parse_array, np.logical_not(parser_mask_fixed))
     else:
         raise NotImplementedError
@@ -163,7 +284,7 @@ def get_mask_location(model_type, category, model_parse: Image.Image, keypoint: 
     img = np.where(inpaint_mask, 255, 0)
     dst = hole_fill(img.astype(np.uint8))
     dst = refine_mask(dst)
-    inpaint_mask = dst / 255 * 1
+    inpaint_mask = img / 255 * 1
     mask = Image.fromarray(inpaint_mask.astype(np.uint8) * 255)
     mask_gray = Image.fromarray(inpaint_mask.astype(np.uint8) * 127)
 
